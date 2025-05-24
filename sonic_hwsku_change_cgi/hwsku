@@ -1,0 +1,323 @@
+#!/usr/bin/python
+
+
+import os
+
+import cgi, cgitb 
+
+from hwsku_migrate import *
+
+global var_dut_ip
+global var_dut_pass
+global var_dut_user
+global var_dut_sku
+global prev_form_page
+
+def fn_debug_log(arg):
+    f = open("", "a")
+
+def fn_debug_print(arg):
+    print( "<i><b>TRACE</b>: ")
+    print( arg)
+    print( "</i>")
+
+def fn_print_header():
+    print( "Content-type: text/html")
+    print( "")
+    print( "")
+
+    print( '<html>')
+    print( '<head>')
+    print( '<title>SONiC HwSKU change</title>')
+    print( '<style type="text/css">')
+    print( '</style>')
+    print( '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
+    print( '</head>')
+    print( "<pre>")
+
+    print( "<body>")
+    print( "<hr>Please contact Antony Rheneus for any issues <hr>")
+    #print( '<div id="loading" style="display:none"><img src="http://10.112.140.50/cgi-bin/sonic_helper/hwsku/loading.gif"></div>')
+    print( '<div id="loading" style="padding-top:100.000%;position:relative;display:none"><iframe src="https://gifer.com/embed/g0R9" width="10%" height="10%" style="position:absolute;top:0;left:0;" frameBorder="0" allowFullScreen></iframe><p> Loading, please wait .. </p></div>')
+    print(' <script>')
+    print(' var iFrame = document.getElementById("loading");')
+    print(' function showloading() {')
+    print('   iFrame.style.display = "block";')
+    print(' }')
+    print(' </script>')
+
+def visited():
+    srvr_path="/var/www/cgi-bin/sonic_helper/visited.txt"
+    v = 0
+    try:
+        f = open(srvr_path, "r")
+        v = int(f.read())
+        v = v + 1
+    except:
+        v = 1
+    f = open(srvr_path, "w")
+    f.write(str(v))
+    print("<i>Visited: %s </i>" % str(v))
+
+def fn_print_footer():
+    print( "</pre>")
+    visited()
+    print( "</body>")
+    print( '</html>')
+
+def fn_printfirst_form(var_dut_ip, var_dut_user, var_dut_pass):
+    var_dut_ip = "0.0.0.0" if var_dut_ip is None else var_dut_ip
+
+    print( '<form name="info" action="hwsku" method="get" onsubmit="showloading(); return true;">')
+    #print( '<br>')
+    print( "SONiC DUT IP  <input type='text' name='dut_ip' value=" + var_dut_ip + ">")
+    print( '<br>')
+    print ( 'SSH Username <input type="text" name="dut_user" list="defaultuser" value="admin" />')
+    print ( '<datalist id="defaultuser">')
+    print ( '<option value="admin">admin </option>')
+    print ( '<option value="root">root </option>')
+    print ( '</datalist>')
+    #print( '<br>')
+    print ( 'SSH Password <input type="text" name="dut_pass" list="defaultpass" />')
+    print ( '<datalist id="defaultpass">')
+    print ( '<option value="Innovium123">Innovium123 </option>')
+    print ( '<option value="YourPaSsWoRd">YourPaSsWoRd </option>')
+    print ( '<option value="admin">admin</option>')
+    print ( '</datalist>')
+    #print( '<br>')
+    print( '<input type="hidden" id="form" name="form" value="1">')
+    print( '<input type="submit" value="submit">')
+    print( '</form>')
+    print( '<br>')
+    print( '<hr>')
+    print( '<br>')
+
+def fn_print_http_params():
+    for param in os.environ.keys():
+        print ("<b>%20s</b>: %s<\br>" % (param, os.environ[param]))
+
+def fn_get_query_string():
+    form = cgi.FieldStorage() 
+
+    prev_form_page = form.getvalue('form')
+    if not prev_form_page:
+        prev_form_page = 0
+
+    var_dut_ip = form.getvalue('dut_ip')
+    var_dut_pass = form.getvalue('dut_pass')
+    var_dut_user = form.getvalue('dut_user')
+    #if var_dut_ip == "0.0.0.0" or var_dut_ip is None:
+    #     print("<B>ERROR: IP is Invalid<B>")
+    #     print(var_dut_ip)
+
+    if int(prev_form_page) == 3:
+        fn_printfourth_form(var_dut_ip, var_dut_user, var_dut_pass)
+    if int(prev_form_page) == 2:
+        var_dut_sku = form.getvalue('sku')
+        fn_printthird_form(var_dut_ip, var_dut_user, var_dut_pass, var_dut_sku)
+    elif int(prev_form_page) == 1:
+        fn_printsecond_form(var_dut_ip, var_dut_user, var_dut_pass)
+    else:
+        fn_printfirst_form(var_dut_ip, var_dut_user, var_dut_pass)
+
+
+
+
+def fn_test_dut():
+    fn_debug_print(var_dut_ip)
+    fn_debug_print(var_dut_user)
+    fn_debug_print(var_dut_pass)
+    out = fn_get_skus(var_dut_ip, var_dut_user, var_dut_pass)
+    print out
+
+def fn_get_skus(var_dut_ip, var_dut_user, var_dut_pass):
+    global srvr_path
+    global get_script
+    global tmp_path
+    global out
+
+    srvr_path="/var/www/cgi-bin/sonic_helper/"
+    get_script="remote_hwsku_info.sh"
+    tmp_path="/tmp/_"
+    out = []
+    fn_ssh_copy(var_dut_ip, var_dut_user, var_dut_pass, srvr_path, get_script)
+    out = fn_ssh_exec(var_dut_ip, var_dut_user, var_dut_pass, tmp_path+get_script)
+    fn_ssh_exec(var_dut_ip, var_dut_user, var_dut_pass, "rm -f "+tmp_path+get_script)
+    return out
+
+def fn_change_sku(var_dut_ip, var_dut_user, var_dut_pass, var_dut_sku):
+    global srvr_path
+    global get_script
+    global tmp_path
+    global out
+
+    srvr_path="/var/www/cgi-bin/sonic_helper/"
+    get_script="remote_hwsku_update.sh"
+    tmp_path="/tmp/_"
+    out = []
+    print( '<hr><h3>SONiC Platform</h3><br>')
+    print( '<p>')
+    fn_ssh_copy(var_dut_ip, var_dut_user, var_dut_pass, srvr_path, get_script)
+    out = fn_ssh_exec(var_dut_ip, var_dut_user, var_dut_pass, tmp_path+get_script+" "+var_dut_sku)
+    for s in out:
+	print( s )
+
+    print( '</p>')
+    print( '<hr><br>')
+    print( '<b>Rebooted the board </h2><br> Check status :')
+
+def fn_check_sku_status(var_dut_ip, var_dut_user, var_dut_pass):
+
+    srvr_path="/var/www/cgi-bin/sonic_helper/"
+    print( '<hr><h3>SONiC Platform</h3><br>')
+    print( '<p>')
+    out = fn_local_exec_v1(srvr_path+"remote_system_up.sh", var_dut_ip)
+    for s in out:
+	print( s )
+    print( '</p>')
+    print( '<hr><br>')
+
+
+def fn_get_platform(var_dut_ip, var_dut_user, var_dut_pass):
+    global cur_sku
+
+    if var_dut_ip == "0.0.0.0":
+         print("<B>ERROR: IP is Invalid<B>")
+
+    srvr_path="/var/www/cgi-bin/sonic_helper/"
+    tmp_cmd="cat /etc/sonic/sonic-environment"
+    out = []
+    out = fn_ssh_exec(var_dut_ip, var_dut_user, var_dut_pass, tmp_cmd)
+    cur_sku=""
+
+    print( '<hr><h3>SONiC Platform</h3><br>')
+    print( '<p>')
+    for s in out:
+        if "HWSKU" in s:
+            cur_sku = s.replace("HWSKU=", "")
+	print( s )
+    print( '</p>')
+
+    print( '<hr><br>')
+    print( "<b><i>Current SKU </i>: "+cur_sku+"</b>")
+    return out
+
+def fn_print_sonic_cmd(cmd):
+    global cur_sku
+    global var_dut_ip
+    global var_dut_pass
+    global var_dut_user
+    global var_dut_sku
+    global prev_form_page
+
+    srvr_path="/var/www/cgi-bin/sonic_helper/"
+    out = []
+    out = fn_ssh_exec(var_dut_ip, var_dut_user, var_dut_pass, cmd)
+    cur_sku=""
+
+    print( '<hr><h3>SONiC Command ' + cmd +'</h3><br>')
+    print( '<p>')
+    for s in out:
+	print( s )
+    print( '</p>')
+
+    print( '<hr><br>')
+
+def fn_simple_submit(form_val, submit_str, var_dut_ip, var_dut_user, var_dut_pass):
+
+    print( '<form name="info" action="hwsku" method="get" onsubmit="showloading(); return true;">')
+    print( "<input type='submit' value=" +submit_str +">")
+    print( "<input type='hidden' id='form' name='form' value="+form_val+ ">")
+    print( "<input type='hidden' name='dut_ip' value=" + var_dut_ip + ">")
+    print( "<input type='hidden' name='dut_user' value=" + var_dut_user+ ">")
+    print( "<input type='hidden' name='dut_pass' value=" + var_dut_pass + ">")
+    print( '</form>')
+    print( '<br>')
+    print( '<hr>')
+    print( '<br>')
+
+def fn_fill_sku_list(var_dut_ip, var_dut_user, var_dut_pass):
+    print( '<form name="info" action="hwsku" method="get" onsubmit="showloading(); return true;">')
+    print( '<br><b>Select the SKU</b>')
+    skus = fn_get_skus(var_dut_ip, var_dut_user, var_dut_pass)
+    for s in skus:
+        print ( "<input type='radio' name='sku' value="+s+">"+s)
+    print( '<br>')
+    print( '<input type="submit" value="submit">')
+    print( '<input type="hidden" id="form" name="form" value="2">')
+    print( "<input type='hidden' name='dut_ip' value=" + var_dut_ip + ">")
+    print( "<input type='hidden' name='dut_user' value=" + var_dut_user+ ">")
+    print( "<input type='hidden' name='dut_pass' value=" + var_dut_pass + ">")
+    print( '</form>')
+    print( '<br>')
+    print( '<hr>')
+    print( '<br>')
+
+def fn_printfourth_form(var_dut_ip, var_dut_user, var_dut_pass):
+    fn_check_sku_status(var_dut_ip, var_dut_user, var_dut_pass)
+    fn_get_platform(var_dut_ip, var_dut_user, var_dut_pass)
+    fn_print_sonic_cmd("show interface status")
+    fn_simple_submit("3", "Status", var_dut_ip, var_dut_user, var_dut_pass)
+    fn_simple_submit("100", "Home", var_dut_ip, var_dut_user, var_dut_pass)
+
+def fn_printthird_form(var_dut_ip, var_dut_user, var_dut_pass, var_dut_sku):
+    fn_change_sku(var_dut_ip, var_dut_user, var_dut_pass, var_dut_sku)
+    fn_simple_submit("3", "Status", var_dut_ip, var_dut_user, var_dut_pass)
+
+def fn_printsecond_form(var_dut_ip, var_dut_user, var_dut_pass):
+    fn_get_platform(var_dut_ip, var_dut_user, var_dut_pass)
+    fn_fill_sku_list(var_dut_ip, var_dut_user, var_dut_pass)
+
+def _main():
+    # Enable cgi trace back for debugging
+    cgitb.enable()
+
+    fn_print_header()
+
+    fn_get_query_string()
+
+    fn_print_footer()
+
+def fn_test_form0():
+    print ("Form0 Not implemented")
+
+def fn_test_form1():
+    print ("Form1 implemented")
+    fn_printsecond_form(var_dut_ip, var_dut_user, var_dut_pass)
+    #fn_get_platform()
+    #fn_fill_sku_list()
+
+def fn_test_form2():
+    print ("Form2 Not implemented")
+
+def fn_test_me():
+    global var_dut_ip
+    global var_dut_pass
+    global var_dut_user
+    global var_dut_sku
+    global prev_form_page
+
+    var_dut_ip = "10.112.140.37"
+    var_dut_user = "admin" if var_dut_user is None else var_dut_user
+    var_dut_pass = "Innovium123" if var_dut_pass is None else var_dut_pass
+    fn_test_dut()
+    prev_form_page = 0
+    fn_test_form0()
+    prev_form_page = 1
+    fn_test_form1()
+    prev_form_page = 2
+    fn_test_form2()
+
+
+# Start to run
+var_dut_ip = "0.0.0.0"
+var_dut_user = "admin"
+var_dut_pass = "Innovium123"
+
+#if __name__ == "__main__":
+#    #fn_test_me()
+#    print('<i>Contact antonyr@marvell.com</i>')
+
+
+_main()
+

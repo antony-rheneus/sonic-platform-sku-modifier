@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+
+import os
+import sys
+
+#sys.path.append(os.path.abspath("/usr/lib/cgi-bin/sonic_helper"))
+#sys.path.append("..")
+#sys.path.append("/usr/lib/cgi-bin/sonic_helper")
+
+#print(sys.path)
+from hwsku import *
+
+
+
