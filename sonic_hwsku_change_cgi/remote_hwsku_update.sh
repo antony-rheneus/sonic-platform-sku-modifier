@@ -59,7 +59,7 @@ update_config()
 		echo "}}" >> /tmp/d.json
 		DVC_OPT=" -j /tmp/d.json "
 		echo "{" > /tmp/e.json
-                sed -n '/MGMT_INTERFACE/,/}/p' $FNAME >> /tmp/e.json
+                sed -n '/MGMT_INTERFACE/,/}$/p' $FNAME >> /tmp/e.json
 		echo "}}" >> /tmp/e.json
 		lines=(`wc -l /tmp/e.json`)
 		if [ ${lines[0]} -gt 2 ]; then
